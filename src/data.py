@@ -1,10 +1,11 @@
 import random
 import itertools
-import random
 import logging
 import json
 from pathlib import Path
 from dataclasses import dataclass
+
+import pandas as pd
 
 import torch
 from torch.utils.data import Dataset
@@ -168,3 +169,167 @@ class PretrainCollator:
 
         return {'input_ids': seq_ids,
                 'labels': labels}
+
+
+class VisualQuestionAnswer(Dataset):
+    """This Dataset purely load collection of image, question, answer triplets
+        with ViVQA format
+    """
+
+    def __init__(self, img_root_dir: Path, csv_dir: Path,
+                 split: str = 'train'):
+        """
+        Parameters
+        ----------
+        img_root_dir : Path
+            Directory where contains train2017/ and val2017/
+        csv_dir : Path
+            Directory where contains all csv files
+            Where github.com/kh4nh12/ViVQA is cloned
+        split : str, optional
+            'train' or 'test', by default 'train'
+        """
+        self.img_root_dir = img_root_dir
+        self.img_train_dir = img_root_dir.joinpath('train2017')
+        self.img_val_dir = img_root_dir.joinpath('val2017')
+
+        self.csv_split_file = csv_dir.joinpath(f'{split}.csv')
+
+        self.dataset = pd.read_csv(self.csv_split_file, index_col=0)
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, index: int):
+        """
+        Parameters
+        ----------
+        index : int
+            index in the csv file
+
+        Returns
+        -------
+        Dict
+            Example return:
+            {'img_file': PosixPath('/mnt/disks/nlpvnhub/dinhanhx/train2017/000000131731.jpg'),
+            'question': 'màu của lông là gì',
+            'answer': 'màu đen'}
+        """
+        data = self.dataset.iloc[index]
+        for img_dir in [self.img_train_dir, self.img_val_dir]:
+            img_file = img_dir.joinpath(str(data['img_id']).zfill(12)+'.jpg')
+            if img_file.is_file():
+                return {'img_file': img_file,
+                        'question': data['question'],
+                        'answer': data['answer']}
+
+    def run_sanity_check(self):
+        """Check files, directories, and images path exist or not
+        """
+        for index, data in tqdm(self.dataset.iterrows()):
+            file_found = False
+            for img_dir in [self.img_train_dir, self.img_val_dir]:
+                img_file = img_dir.joinpath(str(data['img_id']).zfill(12)+'.jpg')
+                if img_file.is_file():
+                    file_found = True
+
+            if not file_found:
+                logging.warn(f'{data} @ {self.csv_split_file} has no image')
+
+
+@dataclass
+class VisualQuestionAnswerCollator:
+    tokenizer: BunTokenizer
+    image_size: list
+    patch_size: list
+
+    def __call__(self, batch_inputs):
+        batch_length = len(batch_inputs)
+        batch_texts = []
+        batch_imgs = []
+        for i in batch_inputs:
+            batch_texts.append(i['question'] + ' ? ' + i['answer'])
+            batch_imgs.append(i['img_file'])
+
+        text_inputs = self.tokenizer(batch_texts,
+                                     return_tensors='pt',
+                                     padding='max_length',
+                                     max_length=37)
+        labels = self.make_labels(text_inputs.input_ids)
+        image_inputs = self.tensorize_image_batch(batch_imgs)
+
+        num_patches = (self.image_size[0] // self.patch_size[0]) * (self.image_size[1] // self.patch_size[1])
+        # Extend the shape of text_inputs.attention_masks to cover image_inputs
+        extra_attention_mask = torch.ones(batch_length, num_patches, dtype=text_inputs.attention_mask.dtype)
+        attention_mask = torch.cat((text_inputs.attention_mask, extra_attention_mask), dim=1)
+
+        # Extend the shape of labels to cover image_inputs
+        extra_labels = torch.full((batch_length, num_patches), -100)
+        labels = torch.cat((labels, extra_labels), dim=1)
+
+        return BatchEncoding({'input_ids': text_inputs.input_ids,
+                              'labels': labels,
+                              'attention_mask': attention_mask,
+                              'token_type_ids': text_inputs.token_type_ids,
+                              'image_input': image_inputs})
+
+    def tensorize_image_batch(self, batch_imgs):
+        return torch.stack([resize(read_image(str(img), ImageReadMode.RGB),
+                                   self.image_size) for img in batch_imgs],
+                           0).float()
+
+    def make_labels(self, input_ids):
+        labels = input_ids.clone()
+        if self.tokenizer.pad_token_id is not None:
+            labels[labels == self.tokenizer.pad_token_id] = -100
+
+        return labels
+
+
+@dataclass
+class ImageCaptioningCollator:
+    tokenizer: BunTokenizer
+    image_size: list
+    patch_size: list
+
+    def __call__(self, batch_inputs):
+        batch_length = len(batch_inputs)
+        batch_texts = []
+        batch_imgs = []
+        for i in batch_inputs:
+            batch_texts.append(i['caption'])
+            batch_imgs.append(i['img_file'])
+
+        text_inputs = self.tokenizer(batch_texts,
+                                     return_tensors='pt',
+                                     padding='max_length',
+                                     max_length=85)
+        labels = self.make_labels(text_inputs.input_ids)
+        image_inputs = self.tensorize_image_batch(batch_imgs)
+
+        num_patches = (self.image_size[0] // self.patch_size[0]) * (self.image_size[1] // self.patch_size[1])
+        # Extend the shape of text_inputs.attention_masks to cover image_inputs
+        extra_attention_mask = torch.ones(batch_length, num_patches, dtype=text_inputs.attention_mask.dtype)
+        attention_mask = torch.cat((text_inputs.attention_mask, extra_attention_mask), dim=1)
+
+        # Extend the shape of labels to cover image_inputs
+        extra_labels = torch.full((batch_length, num_patches), -100)
+        labels = torch.cat((labels, extra_labels), dim=1)
+
+        return BatchEncoding({'input_ids': text_inputs.input_ids,
+                              'labels': labels,
+                              'attention_mask': attention_mask,
+                              'token_type_ids': text_inputs.token_type_ids,
+                              'image_input': image_inputs})
+
+    def tensorize_image_batch(self, batch_imgs):
+        return torch.stack([resize(read_image(str(img), ImageReadMode.RGB),
+                                   self.image_size) for img in batch_imgs],
+                           0).float()
+
+    def make_labels(self, input_ids):
+        labels = input_ids.clone()
+        if self.tokenizer.pad_token_id is not None:
+            labels[labels == self.tokenizer.pad_token_id] = -100
+
+        return labels
