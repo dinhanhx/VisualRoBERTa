@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Tuple
 import logging
 
 import torch
@@ -10,7 +10,8 @@ from transformers.models.roberta.modeling_roberta import (RobertaEmbeddings,
                                                           RobertaPooler,
                                                           RobertaLMHead)
 from transformers.models.roberta.configuration_roberta import RobertaConfig
-from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
+from transformers.modeling_outputs import (BaseModelOutputWithPoolingAndCrossAttentions,
+                                           CausalLMOutputWithCrossAttentions)
 from transformers.models.bert.modeling_bert import BertForPreTrainingOutput
 
 from src.image_embedding import PatchEmbedding, RegionEmbedding
@@ -131,11 +132,22 @@ class ImageTextModel(RobertaPreTrainedModel):
         """
         End of Copied from class RoBERTaModel
         """
-        
+
         image_embedding_output = self.image_embedding(image_input)
-        
+
         concat_output = torch.cat((embedding_output, image_embedding_output), dim=1)
-        
+
+        # To cover image_input
+        # To fix self.get_extended_attention_mask(attention_mask, input_shape)
+        # when self.config.is_decoder
+        # it's somewhat magic, don't touch it
+        if self.config.is_decoder:
+            _, _, text_seq_len, total_seq_len = extended_attention_mask.shape
+            extended_attention_mask = torch.stack([torch.cat((b_i,
+                                                              b_i[0, -1, :].repeat(1, total_seq_len-text_seq_len, 1)),
+                                                             dim=-2)
+                                                   for b_i in extended_attention_mask],
+                                                  dim=0)
         encoder_outputs = self.econder(
             concat_output,
             attention_mask=extended_attention_mask,
@@ -163,8 +175,8 @@ class ImageTextModel(RobertaPreTrainedModel):
 
 
 class ImageTextForPretraining(RobertaPreTrainedModel):
-    """Modified from class RobertaForMaskedLM
-        to be similiar to BertForPretraining
+    """ Modified from class RobertaForMaskedLM
+        to be similar to BertForPretraining
     """
     _keys_to_ignore_on_save = [r"lm_head.decoder.weight", r"lm_head.decoder.bias"]
     _keys_to_ignore_on_load_missing = [r"position_ids", r"lm_head.decoder.weight", r"lm_head.decoder.bias"]
@@ -219,7 +231,7 @@ class ImageTextForPretraining(RobertaPreTrainedModel):
 
         total_loss = None
         if labels is not None and match_labels is not None:
-            loss_fct = nn.CrossEntropyLoss() 
+            loss_fct = nn.CrossEntropyLoss()
             masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
             next_sentence_loss = loss_fct(imagetext_relations_score.view(-1, 2), match_labels.view(-1))
             total_loss = masked_lm_loss + next_sentence_loss
@@ -235,3 +247,90 @@ class ImageTextForPretraining(RobertaPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+
+class ImageTextForCausalLM(RobertaPreTrainedModel):
+    """ Copied from RobertaForCausalLM
+    """
+    _keys_to_ignore_on_save = [r"lm_head.decoder.weight", r"lm_head.decoder.bias"]
+    _keys_to_ignore_on_load_missing = [r"position_ids", r"lm_head.decoder.weight", r"lm_head.decoder.bias"]
+    _keys_to_ignore_on_load_unexpected = [r"pooler"]
+
+    def __init__(self, config: ImageTextConfig):
+        super().__init__(config)
+
+        if not config.is_decoder:
+            logging.warning('If you want to use `BertLMHeadModel` as a standalone, add `is_decoder=True.`')
+
+        self.imagetext = ImageTextModel(config)
+        self.lm_head = RobertaLMHead(config)
+
+        self.update_keys_to_ignore(config, ["lm_head.decoder.weight"])
+        self.post_init()
+
+    def forward(self,
+                input_ids: Optional[torch.LongTensor] = None,
+                attention_mask: Optional[torch.FloatTensor] = None,
+                token_type_ids: Optional[torch.LongTensor] = None,
+                position_ids: Optional[torch.LongTensor] = None,
+                head_mask: Optional[torch.FloatTensor] = None,
+                inputs_embeds: Optional[torch.FloatTensor] = None,
+                encoder_hidden_states: Optional[torch.FloatTensor] = None,
+                encoder_attention_mask: Optional[torch.FloatTensor] = None,
+                labels: Optional[torch.LongTensor] = None,
+                past_key_values: Tuple[Tuple[torch.FloatTensor]] = None,  # type: ignore
+                use_cache: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                return_dict: Optional[bool] = None,
+                image_input: Optional[torch.Tensor] = None):
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        if labels is not None:
+            use_cache = False
+
+        outputs = self.imagetext(input_ids,
+                                 attention_mask=attention_mask,
+                                 token_type_ids=token_type_ids,
+                                 position_ids=position_ids,
+                                 head_mask=head_mask,
+                                 inputs_embeds=inputs_embeds,
+                                 encoder_hidden_states=encoder_hidden_states,
+                                 encoder_attention_mask=encoder_attention_mask,
+                                 past_key_values=past_key_values,
+                                 use_cache=use_cache,
+                                 output_attentions=output_attentions,
+                                 output_hidden_states=output_hidden_states,
+                                 return_dict=return_dict,
+                                 image_input=image_input)
+
+        sequence_output = outputs[0]
+        prediction_scores = self.lm_head(sequence_output)
+
+        lm_loss = None
+        if labels is not None:
+            # we are doing next-token prediction; shift prediction scores and input ids by one
+            shifted_prediction_scores = prediction_scores[:, :-1, :].contiguous()
+            labels = labels[:, 1:].contiguous()  # type: ignore
+            loss_fct = nn.CrossEntropyLoss()
+            lm_loss = loss_fct(shifted_prediction_scores.view(-1, self.config.vocab_size),
+                               labels.view(-1))  # type: ignore
+
+        if not return_dict:
+            output = (prediction_scores,) + outputs[2:]
+            return ((lm_loss,) + output) if lm_loss is not None else output
+
+        return CausalLMOutputWithCrossAttentions(
+            loss=lm_loss,
+            logits=prediction_scores,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+            cross_attentions=outputs.cross_attentions,
+        )
+
+    def prepare_inputs_for_generation(self):
+        raise NotImplementedError
+
+    def _reorder_cache(self):
+        raise NotImplementedError
