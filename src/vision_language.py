@@ -142,12 +142,13 @@ class ImageTextModel(RobertaPreTrainedModel):
         # when self.config.is_decoder
         # it's somewhat magic, don't touch it
         if self.config.is_decoder:
-            _, _, text_seq_len, total_seq_len = extended_attention_mask.shape
+            # _, _, text_seq_len, total_seq_len = extended_attention_mask.shape
             extended_attention_mask = torch.stack([torch.cat((b_i,
-                                                              b_i[0, -1, :].repeat(1, total_seq_len-text_seq_len, 1)),
+                                                              b_i[0, -1, :].repeat(1, self.get_num_patches, 1)),
                                                              dim=-2)
                                                    for b_i in extended_attention_mask],
                                                   dim=0)
+
         encoder_outputs = self.econder(
             concat_output,
             attention_mask=extended_attention_mask,
@@ -172,6 +173,11 @@ class ImageTextModel(RobertaPreTrainedModel):
             attentions=encoder_outputs.attentions,
             cross_attentions=encoder_outputs.cross_attentions
         )
+
+    @property
+    def get_num_patches(self):
+        return (self.config.image_size[0] // self.config.patch_size[0]) \
+            * (self.config.image_size[1] // self.config.patch_size[1])
 
 
 class ImageTextForPretraining(RobertaPreTrainedModel):
@@ -268,6 +274,10 @@ class ImageTextForCausalLM(RobertaPreTrainedModel):
         self.update_keys_to_ignore(config, ["lm_head.decoder.weight"])
         self.post_init()
 
+        # To store raw image
+        # See self.prepare_inputs_for_generation()
+        self.__image_input_cache__ = None
+
     def forward(self,
                 input_ids: Optional[torch.LongTensor] = None,
                 attention_mask: Optional[torch.FloatTensor] = None,
@@ -329,8 +339,63 @@ class ImageTextForCausalLM(RobertaPreTrainedModel):
             cross_attentions=outputs.cross_attentions,
         )
 
-    def prepare_inputs_for_generation(self):
-        raise NotImplementedError
+    def prepare_inputs_for_generation(self, input_ids: torch.Tensor, past=None, **model_kwargs):
+        if past is not None:
+            # To handle the inputs with past
+            assert type(self.__image_input_cache__) is not None, ("self.__image_input_cache is None. "
+                                                                  "Check `image_input` in your `inputs`, "
+                                                                  "Or something wrong with this function"
+                                                                  "when being called for first time.")
 
-    def _reorder_cache(self):
-        raise NotImplementedError
+            batch_length = input_ids.shape[0]
+            num_patches = self.get_num_patches
+
+            last_input_ids = input_ids[:, -1:]
+            attention_mask = torch.ones_like(input_ids)
+            last_token_type_ids = torch.zeros_like(last_input_ids)
+
+            # Extend the shape of last_attention_masks to cover image_inputs
+            extra_attention_mask = torch.ones(batch_length, num_patches, dtype=attention_mask.dtype)
+            attention_mask = torch.cat((attention_mask, extra_attention_mask), dim=1)
+
+            # Remove image modality from `past_key_values`
+            # Because `past` is (text, image) and when Transformer (in this scope, RobertaEncoder)
+            # appends new token, new token is appended to `past`
+            # `past` becomes (text, image, new token) hence it breaks the sequence of text
+            # Therefore, `image` needs to be removed.
+            # HOWEVER this action makes the model compute more slowly because it has to recompute image modality
+            # for people whoever work on this code, please try to make things faster
+            # probably need to change the order of inputs in torch.cat in `forward()` in `ImageTextModel`
+            # then probably need to retrain the model
+            new_past = tuple((tuple((past_key[:, :, :-num_patches, :] for past_key in layer)) for layer in past))
+            return {'input_ids': last_input_ids,
+                    'past_key_values': new_past,
+                    'attention_mask': attention_mask,
+                    'token_type_ids': last_token_type_ids,
+                    'image_input': self.__image_input_cache__}
+        else:
+            # To handle the very first inputs
+
+            # Handle beam search case
+            self.__image_input_cache__ = model_kwargs.get('image_input', None).repeat(input_ids.shape[0], 1, 1, 1)
+            logging.warning(f'{input_ids.shape} - {self.__image_input_cache__.shape}')
+            return {'input_ids': input_ids,
+                    'attention_mask': model_kwargs.get('attention_mask', None),
+                    'token_type_ids': model_kwargs.get('token_type_ids', None),
+                    'image_input': self.__image_input_cache__}
+
+    def _reorder_cache(self, past, beam_idx):
+        """ Copied from RoBERTaForCasualLM
+            You may find the implementation of GPT-2's one a bit different
+            however both do same things
+            https://github.com/huggingface/transformers/blob/983e40ac3b2af68fd6c927dce09324d54d023e54/src/transformers/models/gpt2/modeling_gpt2.py#L1104-L1114  # noqa
+        """
+        reordered_past = ()
+        for layer_past in past:
+            reordered_past += (tuple(past_state.index_select(0, beam_idx) for past_state in layer_past),)
+        return reordered_past
+
+    @property
+    def get_num_patches(self):
+        return (self.config.image_size[0] // self.config.patch_size[0]) \
+            * (self.config.image_size[1] // self.config.patch_size[1])
