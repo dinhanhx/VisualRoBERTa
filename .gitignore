@@ -1,7 +1,6 @@
 *.ckpt
-assets/
-bk_lightning_logs/
-exp_logs/
+*.pt
+events.out.tfevents.*
 lightning_logs/
 logs/
 
