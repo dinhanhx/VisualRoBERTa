@@ -8,3 +8,5 @@ pip3 install pandas
 pip3 install einops
 pip3 install sentencepiece
 pip3 install transformers[torch]
+pip3 install pytorch-lightning==1.6.5
+pip3 install rich
