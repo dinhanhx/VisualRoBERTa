@@ -57,8 +57,8 @@ class Wrapper(pl.LightningModule):
     
 if '__main__' == __name__:
     seed_everything(5)
-    pretrain_task = PretrainTask(Path('/mnt/disks/nlpvnhub/dinhanhx/'),
-                                 Path('/mnt/disks/nlpvnhub/dinhanhx/TranslateCOCO2017'),
+    pretrain_task = PretrainTask(Path('~/data/'),
+                                 Path('~/data/TranslateCOCO2017'),
                                  split='train')
 
     bun_tokenizer = BunTokenizer.from_pretrained('vinai/bartpho-syllable')
