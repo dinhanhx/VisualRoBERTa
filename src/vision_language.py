@@ -142,12 +142,10 @@ class ImageTextModel(RobertaPreTrainedModel):
         # when self.config.is_decoder
         # it's somewhat magic, don't touch it
         if self.config.is_decoder:
-            # _, _, text_seq_len, total_seq_len = extended_attention_mask.shape
-            extended_attention_mask = torch.stack([torch.cat((b_i,
-                                                              b_i[0, -1, :].repeat(1, self.get_num_patches, 1)),
-                                                             dim=-2)
-                                                   for b_i in extended_attention_mask],
-                                                  dim=0)
+            extended_attention_mask = __class__.correct_extend_attention_mask(input_shape=input_shape,
+                                                                              attention_mask_=attention_mask,
+                                                                              num_patches_=self.get_num_patches,
+                                                                              model_dtype=self.dtype)
 
         encoder_outputs = self.econder(
             concat_output,
@@ -178,6 +176,74 @@ class ImageTextModel(RobertaPreTrainedModel):
     def get_num_patches(self):
         return (self.config.image_size[0] // self.config.patch_size[0]) \
             * (self.config.image_size[1] // self.config.patch_size[1])
+
+    @staticmethod
+    def correct_extend_attention_mask(input_shape: torch.Size,
+                                      attention_mask_: torch.Tensor,
+                                      num_patches_: int,
+                                      model_dtype,
+                                      optimize: bool = True):
+        device = attention_mask_.device
+        dtype = attention_mask_.dtype
+        batch_size, seq_length = input_shape
+
+        extended_attention_mask = []
+        for i in range(batch_size):
+            total_length = attention_mask_[i].shape[0]
+            pad_length = total_length - torch.count_nonzero(attention_mask_[i]).item()
+            text_length = total_length - pad_length - num_patches_
+
+            if seq_length == (text_length + pad_length):
+                casual_attention_mask = torch.zeros((total_length, total_length),
+                                                    dtype=dtype,
+                                                    device=device)
+                # Triangle mask for text modality
+                triangle_mask = torch.tril(
+                        torch.ones((text_length, text_length),  # type: ignore
+                                   dtype=dtype,
+                                   device=device)
+                        )
+                casual_attention_mask[0:text_length, 0:text_length].copy_(
+                    triangle_mask
+                    )
+                # Attetion from text to image
+                casual_attention_mask[0:text_length, text_length+pad_length:] = 1
+                # Full attention mask for image modality
+                casual_attention_mask[text_length+pad_length:, text_length+pad_length:] = 1
+            else:
+                # TODO - handle when `past_key_values` are used
+                # prefix ones mask added in front of casual mask
+                prefix_length = text_length - seq_length
+                casual_attention_mask = torch.zeros((seq_length+num_patches_, text_length+num_patches_),
+                                                    dtype=dtype,
+                                                    device=device)
+                # Add prefix ones mask
+                prefix_ones = torch.ones((seq_length, prefix_length),  # type: ignore
+                                         dtype=dtype,
+                                         device=device)
+                casual_attention_mask[0:seq_length, 0:prefix_length].copy_(prefix_ones)
+                # Add casual mask behind
+                triangle_mask = torch.tril(
+                    torch.ones((seq_length, seq_length),
+                               dtype=dtype,
+                               device=device)
+                )
+                casual_attention_mask[0:seq_length, prefix_length:text_length].copy_(triangle_mask)
+                # Attention from text to image
+                casual_attention_mask[0:seq_length, text_length:] = 1
+                # Attetion for image modality
+                casual_attention_mask[seq_length:, text_length:] = 1
+
+            extended_attention_mask.append(casual_attention_mask)
+
+        extended_attention_mask = torch.stack(extended_attention_mask, dim=0)
+
+        extended_attention_mask = extended_attention_mask[:, None, :, :]
+        if optimize:
+            extended_attention_mask = extended_attention_mask.to(dtype=model_dtype)  # fp16 compatibility
+            extended_attention_mask = (1.0 - extended_attention_mask) * torch.finfo(model_dtype).min
+
+        return extended_attention_mask
 
 
 class ImageTextForPretraining(RobertaPreTrainedModel):
