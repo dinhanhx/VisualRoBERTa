@@ -190,7 +190,7 @@ class ImageTextModel(RobertaPreTrainedModel):
         extended_attention_mask = []
         for i in range(batch_size):
             total_length = attention_mask_[i].shape[0]
-            pad_length = total_length - torch.count_nonzero(attention_mask_[i]).item()
+            pad_length = total_length - torch.count_nonzero(attention_mask_[i])
             text_length = total_length - pad_length - num_patches_
 
             if seq_length == (text_length + pad_length):
