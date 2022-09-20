@@ -8,9 +8,12 @@ export PT_XLA_DEBUG=1
 export USE_TORCH=ON
 ```
 
-`env_setup.sh` to setup a conda environment which has
-- torch with tpu support
-- torchvision
-- transformer[torch]
+## Conda env setup
 
-`install_cmds.sh` like `env_setup.sh` but just to do `pip install`
+To create a simple env
+```bash
+conda create --name torch-tpu python=3.8 pip
+conda activate torch-tpu
+```
+
+Inside `torch-tpu`, simply run `bash install_cmds.sh`
