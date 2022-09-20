@@ -187,56 +187,68 @@ class ImageTextModel(RobertaPreTrainedModel):
         dtype = attention_mask_.dtype
         batch_size, seq_length = input_shape
 
-        extended_attention_mask = []
-        for i in range(batch_size):
-            total_length = attention_mask_[i].shape[0]
-            pad_length = total_length - torch.count_nonzero(attention_mask_[i])
-            text_length = total_length - pad_length - num_patches_
+        # Create triangle mask for text modality
+        triangle_mask = torch.tril(
+            torch.ones((seq_length, seq_length),
+                       dtype=dtype,
+                       device=device)
+        )[None, :, :].repeat((batch_size, 1, 1))
 
-            if seq_length == (text_length + pad_length):
-                casual_attention_mask = torch.zeros((total_length, total_length),
-                                                    dtype=dtype,
-                                                    device=device)
-                # Triangle mask for text modality
-                triangle_mask = torch.tril(
-                        torch.ones((text_length, text_length),  # type: ignore
-                                   dtype=dtype,
-                                   device=device)
-                        )
-                casual_attention_mask[0:text_length, 0:text_length].copy_(
-                    triangle_mask
-                    )
-                # Attetion from text to image
-                casual_attention_mask[0:text_length, text_length+pad_length:] = 1
-                # Full attention mask for image modality
-                casual_attention_mask[text_length+pad_length:, text_length+pad_length:] = 1
-            else:
-                # TODO - handle when `past_key_values` are used
-                # prefix ones mask added in front of casual mask
-                prefix_length = text_length - seq_length
-                casual_attention_mask = torch.zeros((seq_length+num_patches_, text_length+num_patches_),
-                                                    dtype=dtype,
-                                                    device=device)
-                # Add prefix ones mask
-                prefix_ones = torch.ones((seq_length, prefix_length),  # type: ignore
-                                         dtype=dtype,
-                                         device=device)
-                casual_attention_mask[0:seq_length, 0:prefix_length].copy_(prefix_ones)
-                # Add casual mask behind
-                triangle_mask = torch.tril(
-                    torch.ones((seq_length, seq_length),
+        extended_attention_mask: torch.Tensor = torch.Tensor()
+        if triangle_mask.shape[1] == attention_mask_[:, :-num_patches_].shape[1]:
+            # Filtering ...
+            filtered_triangle_mask = triangle_mask * attention_mask_[:, :seq_length][:, None, :]
+
+            # Create full attention mask for text modality to image modality
+            text_to_image_mask = torch.ones((batch_size, seq_length, num_patches_),
+                                            dtype=dtype,
+                                            device=device)
+            triangle_text_to_image_mask = torch.concat((filtered_triangle_mask, text_to_image_mask), dim=-1)
+
+            # Create extended_attention_mask with zeros as placeholders
+            extended_attention_mask = torch.zeros((batch_size, seq_length+num_patches_, seq_length+num_patches_),
+                                                  dtype=dtype,
+                                                  device=device)
+            extended_attention_mask[:, :seq_length, :].copy_(triangle_text_to_image_mask)
+            # Filtering ...
+            extended_attention_mask = (extended_attention_mask.transpose(-1, -2) * attention_mask_[:, None, :]).transpose(-1, -2)  # noqa
+
+            # Add full attention mask for image modality
+            extended_attention_mask[:, seq_length:, seq_length:].copy_(
+                torch.ones((batch_size, num_patches_, num_patches_),
+                           dtype=dtype,
+                           device=device)
+            )
+        else:
+            # handle when `past_key_values` are used
+            # prefix ones mask added in front of triangle_mask
+            prefix_seq_len = attention_mask_[:, :-num_patches_].shape[1] - triangle_mask.shape[1]
+            triangle_mask = torch.cat(
+                [
+                    torch.ones((batch_size, seq_length, prefix_seq_len),
                                dtype=dtype,
-                               device=device)
-                )
-                casual_attention_mask[0:seq_length, prefix_length:text_length].copy_(triangle_mask)
-                # Attention from text to image
-                casual_attention_mask[0:seq_length, text_length:] = 1
-                # Attetion for image modality
-                casual_attention_mask[seq_length:, text_length:] = 1
+                               device=device),
+                    triangle_mask
+                ],
+                dim=-1
+            )
+            # Create full attention mask for text modality to image modality
+            text_to_image_mask = torch.ones((batch_size, seq_length, num_patches_),
+                                            dtype=dtype,
+                                            device=device)
+            triangle_text_to_image_mask = torch.concat((triangle_mask, text_to_image_mask), dim=-1)
 
-            extended_attention_mask.append(casual_attention_mask)
-
-        extended_attention_mask = torch.stack(extended_attention_mask, dim=0)
+            # Create extended_attention_mask with zeros as placeholders
+            extended_attention_mask = torch.zeros((batch_size, seq_length+num_patches_,
+                                                   seq_length+prefix_seq_len+num_patches_),
+                                                  dtype=dtype,
+                                                  device=device)
+            extended_attention_mask[:, :seq_length, :].copy_(triangle_text_to_image_mask)
+            extended_attention_mask[:, seq_length:, seq_length+prefix_seq_len:].copy_(
+                torch.ones((batch_size, num_patches_, num_patches_),
+                           dtype=dtype,
+                           device=device)
+            )
 
         extended_attention_mask = extended_attention_mask[:, None, :, :]
         if optimize:
