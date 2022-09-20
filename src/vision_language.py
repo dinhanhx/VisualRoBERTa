@@ -27,8 +27,11 @@ from transformers.generation_utils import (GreedySearchOutput,
                                            GreedySearchEncoderDecoderOutput,
                                            BeamSearchOutput,
                                            BeamSearchEncoderDecoderOutput,
-                                           BeamSearchDecoderOnlyOutput)
-from transformers.generation_beam_search import (BeamScorer)
+                                           BeamSearchDecoderOnlyOutput,
+                                           SampleOutput,
+                                           BeamSampleOutput)
+from transformers.generation_beam_search import (BeamScorer,
+                                                 ConstrainedBeamSearchScorer)
 from transformers.pytorch_utils import torch_int_div
 # >> EO Import for Generation << #
 
@@ -854,3 +857,115 @@ class ImageTextForCausalLM(RobertaPreTrainedModel):
                 )
         else:
             return sequence_outputs["sequences"]
+
+    def sample(self,
+               input_ids: torch.LongTensor,
+               logits_processor: Optional[LogitsProcessorList] = None,
+               stopping_criteria: Optional[StoppingCriteriaList] = None,
+               logits_warper: Optional[LogitsProcessorList] = None,
+               max_length: Optional[int] = None,
+               pad_token_id: Optional[int] = None,
+               eos_token_id: Optional[int] = None,
+               output_attentions: Optional[bool] = None,
+               output_hidden_states: Optional[bool] = None,
+               output_scores: Optional[bool] = None,
+               return_dict_in_generate: Optional[bool] = None,
+               synced_gpus: Optional[bool] = False, **model_kwargs) \
+                   -> Union[SampleOutput, torch.LongTensor]:
+        raise NotImplementedError
+        return super().sample(input_ids,
+                              logits_processor,
+                              stopping_criteria,
+                              logits_warper,
+                              max_length,
+                              pad_token_id,
+                              eos_token_id,
+                              output_attentions,
+                              output_hidden_states,
+                              output_scores,
+                              return_dict_in_generate,
+                              synced_gpus, **model_kwargs)
+
+    def beam_sample(self,
+                    input_ids: torch.LongTensor,
+                    beam_scorer: BeamScorer,
+                    logits_processor: Optional[LogitsProcessorList] = None,
+                    stopping_criteria: Optional[StoppingCriteriaList] = None,
+                    logits_warper: Optional[LogitsProcessorList] = None,
+                    max_length: Optional[int] = None,
+                    pad_token_id: Optional[int] = None,
+                    eos_token_id: Optional[int] = None,
+                    output_attentions: Optional[bool] = None,
+                    output_hidden_states: Optional[bool] = None,
+                    output_scores: Optional[bool] = None,
+                    return_dict_in_generate: Optional[bool] = None,
+                    synced_gpus: Optional[bool] = False, **model_kwargs) \
+                        -> Union[BeamSampleOutput, torch.LongTensor]:
+        raise NotImplementedError
+        return super().beam_sample(input_ids,
+                                   beam_scorer,
+                                   logits_processor,
+                                   stopping_criteria,
+                                   logits_warper,
+                                   max_length,
+                                   pad_token_id,
+                                   eos_token_id,
+                                   output_attentions,
+                                   output_hidden_states,
+                                   output_scores,
+                                   return_dict_in_generate,
+                                   synced_gpus, **model_kwargs)
+
+    def group_beam_search(self,
+                          input_ids: torch.LongTensor,
+                          beam_scorer: BeamScorer,
+                          logits_processor: Optional[LogitsProcessorList] = None,
+                          stopping_criteria: Optional[StoppingCriteriaList] = None,
+                          max_length: Optional[int] = None,
+                          pad_token_id: Optional[int] = None,
+                          eos_token_id: Optional[int] = None,
+                          output_attentions: Optional[bool] = None,
+                          output_hidden_states: Optional[bool] = None,
+                          output_scores: Optional[bool] = None,
+                          return_dict_in_generate: Optional[bool] = None,
+                          synced_gpus: Optional[bool] = False, **model_kwargs):
+        raise NotImplementedError
+        return super().group_beam_search(input_ids,
+                                         beam_scorer,
+                                         logits_processor,
+                                         stopping_criteria,
+                                         max_length,
+                                         pad_token_id,
+                                         eos_token_id,
+                                         output_attentions,
+                                         output_hidden_states,
+                                         output_scores,
+                                         return_dict_in_generate,
+                                         synced_gpus, **model_kwargs)
+
+    def constrained_beam_search(self,
+                                input_ids: torch.LongTensor,
+                                constrained_beam_scorer: ConstrainedBeamSearchScorer,
+                                logits_processor: Optional[LogitsProcessorList] = None,
+                                stopping_criteria: Optional[StoppingCriteriaList] = None,
+                                max_length: Optional[int] = None,
+                                pad_token_id: Optional[int] = None,
+                                eos_token_id: Optional[int] = None,
+                                output_attentions: Optional[bool] = None,
+                                output_hidden_states: Optional[bool] = None,
+                                output_scores: Optional[bool] = None,
+                                return_dict_in_generate: Optional[bool] = None,
+                                synced_gpus: Optional[bool] = None, **model_kwargs) -> Union[BeamSearchOutput, torch.LongTensor]:
+        raise NotImplementedError
+        return super().constrained_beam_search(input_ids,
+                                               constrained_beam_scorer,
+                                               logits_processor,
+                                               stopping_criteria,
+                                               max_length,
+                                               pad_token_id,
+                                               eos_token_id,
+                                               output_attentions,
+                                               output_hidden_states,
+                                               output_scores,
+                                               return_dict_in_generate,
+                                               synced_gpus, **model_kwargs)
