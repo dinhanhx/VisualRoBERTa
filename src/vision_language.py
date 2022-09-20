@@ -456,7 +456,6 @@ class ImageTextForCausalLM(RobertaPreTrainedModel):
 
             # Handle beam search case
             self.__image_input_cache__ = model_kwargs.get('image_input', None).repeat(input_ids.shape[0], 1, 1, 1)
-            logging.warning(f'{input_ids.shape} - {self.__image_input_cache__.shape}')
             return {'input_ids': input_ids,
                     'attention_mask': model_kwargs.get('attention_mask', None),
                     'token_type_ids': model_kwargs.get('token_type_ids', None),
