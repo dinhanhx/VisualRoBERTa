@@ -503,6 +503,8 @@ class ImageTextForCausalLM(RobertaPreTrainedModel):
                       return_dict_in_generate: Optional[bool] = None,
                       synced_gpus: Optional[bool] = False, **model_kwargs) \
                         -> Union[GreedySearchOutput, torch.LongTensor]:
+        """ Copied from transformers.generation_utils.GenerationMixin.greedy_search
+        """
         logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
         if max_length is not None:
@@ -568,6 +570,7 @@ class ImageTextForCausalLM(RobertaPreTrainedModel):
                 cur_len = cur_len + 1
                 continue  # don't waste resources running the code we don't need
 
+            # Get the last token of outputs repect to text modality
             next_token_logits = outputs.logits[:, -(1+self.get_num_patches), :]
 
             # pre-process distribution
