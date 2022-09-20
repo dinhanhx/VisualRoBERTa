@@ -1,0 +1,7 @@
+cff-version: 1.2.0
+message: "If you use this source code or model weights or theory, please cite it as below."
+authors:
+- given-names: "dinhanhx"
+title: "VisualRoBERTa"
+date-released: 2022-09-30
+url: "https://github.com/dinhanhx/VisualRoBERTa"
