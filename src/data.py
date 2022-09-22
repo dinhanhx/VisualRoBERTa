@@ -35,15 +35,30 @@ class ImageTextPair(Dataset):
         json_dir : Path
             Directory where contains COCO anntotations like json files
         split : str
-            'train' or 'val'
+            'train' or 'val' or 'train_uit_viic' or 'val_uit_viic' or 'test_uit_viic'
         """
         self.img_root_dir = img_root_dir
         self.json_dir = json_dir
 
-        self.img_split_dir = img_root_dir.joinpath(
-            'train2017' if split == 'train' else 'val2017')
-        self.json_split_file = json_dir.joinpath(
-            'captions_train2017_trans_plus.json' if split == 'train' else 'captions_val2017_trans.json')
+        if split == 'train':
+            self.img_split_dir = img_root_dir.joinpath('train2017')
+            self.json_split_file = json_dir.joinpath('captions_train2017_trans_plus.json')
+
+        elif split == 'val':
+            self.img_split_dir = img_root_dir.joinpath('val2017')
+            self.json_split_file = json_dir.joinpath('captions_val2017_trans.json')
+
+        elif split == 'train_uit_viic':
+            self.img_split_dir = img_root_dir.joinpath('train2017')
+            self.json_split_file = json_dir.joinpath('uitviic_captions_train2017.json')
+
+        elif split == 'val_uit_viic':
+            self.img_split_dir = img_root_dir.joinpath('train2017')
+            self.json_split_file = json_dir.joinpath('uitviic_captions_val2017.json')
+
+        elif split == 'test_uit_viic':
+            self.img_split_dir = img_root_dir.joinpath('train2017')
+            self.json_split_file = json_dir.joinpath('uitviic_captions_test2017.json')
 
         self.dataset = json.load(open(self.json_split_file))['annotations']
         if do_sort:
