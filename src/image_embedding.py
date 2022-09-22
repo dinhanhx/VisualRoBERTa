@@ -18,13 +18,13 @@ class PatchEmbedding(nn.Module):
 
         self.num_patches = (image_height // patch_height) * \
             (image_width // patch_width)
-        
+
         self.embedding = nn.Sequential(
             Rearrange('B C (NPH PH) (NPW PW) -> (B NPH NPW) C PH PW',
                       PH=patch_height, PW=patch_width),
             ResNetMSA()
         )
-        
+
         self.output_proj = nn.Sequential(
             nn.AdaptiveAvgPool2d((4, 4)),
             nn.Flatten(),
