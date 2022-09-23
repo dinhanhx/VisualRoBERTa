@@ -36,6 +36,8 @@ class ImageTextPair(Dataset):
             Directory where contains COCO anntotations like json files
         split : str
             'train' or 'val' or 'train_uit_viic' or 'val_uit_viic' or 'test_uit_viic'
+        so_sort : bool
+            Simply sort by 'image_id'
         """
         self.img_root_dir = img_root_dir
         self.json_dir = json_dir
