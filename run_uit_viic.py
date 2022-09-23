@@ -75,12 +75,12 @@ if '__main__' == __name__:
                                           image_size=config.image_size,
                                           patch_size=config.patch_size)
 
-    sampler_train = DistributedSampler(
+    sampler = DistributedSampler(
             train_val_ic, num_replicas=xm.xrt_world_size(), rank=xm.get_ordinal(), shuffle=False
         )
     dataloader = DataLoader(train_val_ic,
                             batch_size=8,
-                            sampler=sampler_train,
+                            sampler=sampler,
                             num_workers=24,
                             collate_fn=ic_collator,
                             drop_last=True)
