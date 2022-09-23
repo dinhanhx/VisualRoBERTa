@@ -87,7 +87,7 @@ if '__main__' == __name__:
                       use_pretrain=True)
 
     trainer = Trainer(logger=TensorBoardLogger("ic_logs"),
-                      max_epochs=3,
+                      max_epochs=8,
                       log_every_n_steps=100,
                       accelerator='tpu', devices=8,
                       callbacks=[RichProgressBar(),
