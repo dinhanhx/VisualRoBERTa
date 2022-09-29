@@ -8,3 +8,5 @@ pip3 install sentencepiece
 pip3 install transformers[torch]==4.21.1
 pip3 install pytorch-lightning==1.6.5
 pip3 install rich
+pip3 install evaluate
+pip3 install pyvi
