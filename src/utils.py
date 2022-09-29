@@ -62,3 +62,44 @@ class ImageCaptioningTools:
             return caption
 
 
+class VisualQuestionAnswerTools:
+    """Tools for pre-process and post-forward
+    for inference mode of ImageTextCausalLM
+    """
+
+    @staticmethod
+    def process_raw_data(dp, tokenizer: BunTokenizer, image_size: list, patch_size: list):
+        """ To process a data point from VQA dataloader
+        for the inference phase of ImageTextCasualLM
+        """
+        text_inputs = tokenizer(dp['question'] + ' ? ', return_tensors='pt')
+        image_inputs = torch.stack([resize(read_image(str(dp['img_file']),
+                                                      ImageReadMode.RGB),
+                                           image_size)],
+                                   0).float()
+        num_patches = (image_size[0] // patch_size[0]) * (image_size[1] // patch_size[1])
+
+        # Extend the shape of text_inputs.attention_masks to cover image_inputs
+        extra_attention_mask = torch.ones(1, num_patches, dtype=text_inputs.attention_mask.dtype)
+        attention_mask = torch.cat((text_inputs.attention_mask[:, :-1], extra_attention_mask), dim=1)
+        # [:,:-1] to ignore [SEP] token to enable sentence completion
+
+        return BatchEncoding({'input_ids': text_inputs.input_ids[:, :-1],
+                              'attention_mask': attention_mask,
+                              'token_type_ids': text_inputs.token_type_ids[:, :-1],
+                              'image_input': image_inputs})
+
+    @staticmethod
+    def prettify_output(output, tokenizer: BunTokenizer, return_str: bool = True):
+        """ To remove everything that is behind [SEP]
+        and that is before question mark
+
+        WARNING: question_mark is hardcoded
+        """
+        question_mark_index = (output[0] == 4042).nonzero(as_tuple=True)[0][0]
+        first_sep_index = (output[0] == tokenizer.sep_token_id).nonzero(as_tuple=True)[0][0]
+        answer = output[0][question_mark_index+1: first_sep_index]
+        if return_str:
+            return tokenizer.decode(answer)
+        else:
+            return answer

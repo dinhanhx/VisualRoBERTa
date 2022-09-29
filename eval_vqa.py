@@ -1,44 +1,16 @@
 from src.data import VisualQuestionAnswer, VisualQuestionAnswerCollator
 from src.tokenization import BunTokenizer
 from src.vision_language import ImageTextForCausalLM, ImageTextConfig
+from src.utils import VisualQuestionAnswerTools
 from pathlib import Path
 from tqdm import tqdm
 import torch
-from torchvision.io import read_image, ImageReadMode
-from torchvision.transforms.functional import resize
-from transformers.tokenization_utils_base import BatchEncoding
 import json
+from typing import Callable
 
 
-def process_raw_data(dp, tokenizer: BunTokenizer, image_size: list, patch_size: list):
-    """ To process a data point from VQA dataloader
-    for the inference phase of ImageTextCasualLM
-    """
-    text_inputs = tokenizer(dp['question'] + ' ? ', return_tensors='pt')
-    image_inputs = torch.stack([resize(read_image(str(dp['img_file']),
-                                                  ImageReadMode.RGB),
-                                       image_size)],
-                               0).float()
-    num_patches = (image_size[0] // patch_size[0]) * (image_size[1] // patch_size[1])
-
-    # Extend the shape of text_inputs.attention_masks to cover image_inputs
-    extra_attention_mask = torch.ones(1, num_patches, dtype=text_inputs.attention_mask.dtype)
-    attention_mask = torch.cat((text_inputs.attention_mask[:,:-1], extra_attention_mask), dim=1)  # [:,:-1] to ignore [SEP] token to enable sentence completion
-
-    return BatchEncoding({'input_ids': text_inputs.input_ids[:,:-1],  # [:,:-1] to ignore [SEP] token to enable sentence completion
-                          'attention_mask': attention_mask,
-                          'token_type_ids': text_inputs.token_type_ids[:,:-1],  # [:,:-1] to ignore [SEP] token to enable sentence completion
-                          'image_input': image_inputs})
-
-
-def prettify_output(output, tokenizer: BunTokenizer, return_str: bool = True):
-    question_mark_index = (output[0] == 4042).nonzero(as_tuple=True)[0][0]
-    first_sep_index = (output[0] == 4).nonzero(as_tuple=True)[0][0]
-    answer = output[0][question_mark_index+1: first_sep_index]
-    if return_str:
-        return tokenizer.decode(answer)
-    else:
-        return answer
+process_raw_data: Callable = VisualQuestionAnswerTools.process_raw_data
+prettify_output: Callable = VisualQuestionAnswerTools.prettify_output
 
 
 vqa = VisualQuestionAnswer(Path('/home/dinhanhx/data/'),
