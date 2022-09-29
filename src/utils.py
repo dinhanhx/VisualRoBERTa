@@ -9,6 +9,7 @@ from src.tokenization import BunTokenizer
 
 def prepare_vl_inputs(text_inputs: BatchEncoding, image_input: torch.Tensor, config: ImageTextConfig):
     """ Extend the shape of text_inputs.attention_masks
+    TODO: remove me/end me
     """
     assert text_inputs.input_ids.shape[0] == image_input.shape[0]
     batch_size = image_input.shape[0]
