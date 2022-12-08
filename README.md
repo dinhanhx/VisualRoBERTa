@@ -10,7 +10,7 @@
 
 ## Introduction
 
-The first public Vietnamese visual linguistic foundation model(s). This work was carried out only by myself under supervision of Dr Pham Quang Nhat Minh @ Aimesoft and Dr Tran Gian Son @ USTH. Thanks to Mr Nguyen Anh Duong @ VietAI for TPU supports.
+The first public Vietnamese visual linguistic foundation model(s). This work was carried out only by myself under supervision of Dr Pham Quang Nhat Minh @ Aimesoft and Dr Tran Giang Son @ USTH. Thanks to Mr Nguyen Anh Duong @ VietAI for TPU supports.
 
 Keywords: computer vision, natural language processing, visual linguistic, image text, pretrain, Vietnamese, foundation, multi-modal, machine learning
 
