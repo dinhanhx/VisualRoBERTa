@@ -1,3 +1,8 @@
+REFACTOR IN PROCESS
+===
+
+No I'm serious. Don't touch this.
+
 # VisualRoBERTa
 
 Research supported with Cloud TPUs from Google's TPU Research Cloud (TRC)
@@ -37,7 +42,7 @@ Baseline models are the best models in [UIT-ViIC](https://link.springer.com/chap
 
 Baseline model is the best model in [IC](https://aclanthology.org/2021.paclic-1.72/) paper.
 
-⚠ All trained models are in [this zip](https://storage.googleapis.com/dax_storage/VisualRoBERTa/release_logs.zip) (7.4 GiBs)
+<!-- ⚠ All trained models are in [this zip](https://storage.googleapis.com/dax_storage/VisualRoBERTa/release_logs.zip) (7.4 GiBs) -->
 
 ## Citation
 
@@ -84,7 +89,7 @@ To cite this repos or the models' weights or the theory,
 └── run_vqa.py
 ```
 
-Files or folders with `!` are needed to download from [this zip](https://storage.googleapis.com/dax_storage/VisualRoBERTa/release_logs.zip). It contains checkpoints, model weights, inference tests.
+<!-- Files or folders with `!` are needed to download from [this zip](https://storage.googleapis.com/dax_storage/VisualRoBERTa/release_logs.zip). It contains checkpoints, model weights, inference tests. -->
 
 You can run evaluation files (such as `eval_vqa.py`) on CPU, GPU, TPU (by default, it's on CPU).
 
@@ -110,7 +115,7 @@ In training (`run`) files (such as `run_ptrain.py`), paths to data folders are h
 
 Download links:
 - [MS COCO](https://cocodataset.org/#download)
-- [Translate COCO 2017](https://storage.googleapis.com/dax_storage/VisualRoBERTa/TranslateCOCO2017.zip) this work
+<!-- - [Translate COCO 2017](https://storage.googleapis.com/dax_storage/VisualRoBERTa/TranslateCOCO2017.zip) this work -->
 - [ViVQA](https://github.com/kh4nh12/ViVQA)
 - [UIT-ViIC](https://sites.google.com/uit.edu.vn/uit-nlp/datasets-projects#h.p_Uj6Wqs5dCpc4)
 
@@ -141,7 +146,3 @@ for example, `python eval_vqa.py` will infer the models to produce the answers, 
 You are encouraged to read these files to understand what they do before evaluation.
 
 ⚠ Hardcoded file paths might be updated.
-
-## Self-host web app
-
-[HuggingFace Space VisualRoBERTa Readme](https://huggingface.co/spaces/dinhanhx/VisualRoBERTa/blob/main/README.md) should guide self-host instructions
