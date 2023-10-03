@@ -1,0 +1,21 @@
+torch==1.11.0
+torchvision==0.12.0
+
+# TPU paackgages
+https://storage.googleapis.com/tpu-pytorch/wheels/tpuvm/torch_xla-1.11-cp38-cp38-linux_x86_64.whl
+torch_xla[tpuvm]
+
+pandas
+einops
+sentencepiece
+transformers[torch]==4.21.1
+
+# Lightning packages
+lightning
+rich
+
+# Evaluate packages
+evaluate
+pyvi
+nltk
+rouge_score
