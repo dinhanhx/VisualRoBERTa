@@ -84,7 +84,9 @@ if "__main__" == __name__:
         drop_last=True,
     )
 
-    pretrain_model_path_str = ""
+    pretrain_model_path_str = (
+        "logs/lightning_logs/version_0/checkpoints/imagetext-base.pt"
+    )
 
     wrapper = Wrapper(
         config,
@@ -94,7 +96,7 @@ if "__main__" == __name__:
         pretrain_model_path_str=pretrain_model_path_str,
     )
 
-    do_every_n_steps = 256
+    do_every_n_steps = 32
     root_dir = "vivqa-logs"
 
     trainer = Trainer(
@@ -106,7 +108,10 @@ if "__main__" == __name__:
         devices=8,
         callbacks=[
             RichProgressBar(),
-            ModelCheckpoint(every_n_train_steps=do_every_n_steps),
+            ModelCheckpoint(
+                every_n_epochs=1,
+                save_on_train_epoch_end=True,
+            ),
             LearningRateMonitor(logging_interval="step"),
         ],
         precision="bf16-mixed",
