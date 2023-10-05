@@ -15,15 +15,16 @@ prettify_output: Callable = VisualQuestionAnswerTools.prettify_output
 
 
 vqa = VisualQuestionAnswer(
-    Path("/home/dinhanhx/data/"), Path("/home/dinhanhx/data/ViVQA-main"), split="test"
+    Path("/home/anhvd_m21ict/data/coco-2017-images"),
+    Path("/home/anhvd_m21ict/data/ViVQA"),
+    split="test",
 )
 bun_tokenizer = BunTokenizer.from_pretrained("vinai/bartpho-syllable")
 
-ver = 1
 config = ImageTextConfig.from_json_file("assets/imagetext-casual-base-config.json")
 model = ImageTextForCausalLM(config)  # type: ignore
 model.load_state_dict(
-    torch.load(f"vqa_logs/lightning_logs/version_{ver}/checkpoints/vqa.pt")
+    torch.load("vivqa-logs/lightning_logs/version_0/checkpoints/vivqa.pt")
 )
 model = model.eval()
 

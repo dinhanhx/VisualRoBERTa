@@ -15,18 +15,17 @@ prettify_output: Callable = ImageCaptioningTools.prettify_output
 
 
 ic = ImageTextPair(
-    Path("/home/dinhanhx/data/"),
-    Path("/home/dinhanhx/data/TranslateCOCO2017/"),
+    Path("/home/anhvd_m21ict/data/coco-2017-images"),
+    Path("/home/anhvd_m21ict/data/coco-2017-vi/vi/"),
     split="test_uit_viic",
     do_sort=True,
 )
 bun_tokenizer = BunTokenizer.from_pretrained("vinai/bartpho-syllable")
 
-ver = 1
 config = ImageTextConfig.from_json_file("assets/imagetext-casual-base-config.json")
 model = ImageTextForCausalLM(config)  # type: ignore
 model.load_state_dict(
-    torch.load(f"uit_viic_logs/lightning_logs/version_{ver}/checkpoints/uit_viic.pt")
+    torch.load("uit-viic-logs/lightning_logs/version_0/checkpoints/uit-viic.pt")
 )
 model = model.eval()
 
