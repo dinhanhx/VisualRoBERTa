@@ -13,8 +13,6 @@ Research supported with Cloud TPUs from Google's TPU Research Cloud (TRC)
 
 [![forthebadge](https://forthebadge.com/images/badges/powered-by-black-magic.svg)](https://forthebadge.com)
 
-[![forthebadge](https://img.shields.io/badge/Available%20on-HuggingFace-yellow)](https://huggingface.co/spaces/dinhanhx/VisualRoBERTa)
-
 ## Introduction
 
 The first public Vietnamese visual linguistic foundation model(s). This work was carried out only by myself under supervision of Dr Pham Quang Nhat Minh @ Aimesoft and Dr Tran Giang Son @ USTH. Thanks to Mr Nguyen Anh Duong @ VietAI for TPU supports.
@@ -105,6 +103,11 @@ for example, `python run_pretrain.py` will pretrain the model.
 You are encouraged to read these files to understand what they do before training.
 
 ⚠ Hardcoded file paths might be updated.
+
+Kill leftover processes
+```bash
+pgrep -f "python -m exp.run_pretrain" | xargs kill -9
+```
 
 ## Evaluate models
 
