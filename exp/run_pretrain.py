@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytorch_lightning as pl
 import torch
+import torch_xla.core.xla_model as xm
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import (
     LearningRateMonitor,
@@ -10,6 +11,7 @@ from pytorch_lightning.callbacks import (
 )
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from transformers.optimization import get_linear_schedule_with_warmup
 
 from src.data import PretrainCollator, PretrainTask
@@ -31,10 +33,21 @@ class Wrapper(pl.LightningModule):
             self.model.imagetext.econder.load_state_dict(
                 torch.load("assets/phobert-base-encoder.pt")
             )
+        self.automatic_optimization = False
 
     def training_step(self, batch, batch_idx):
+        opt = self.optimizers()
+        opt.zero_grad()
+
         loss = self.model(**batch).loss
         self.log("train_loss", loss)
+        self.manual_backward(loss)
+
+        opt.step()
+        sch = self.lr_schedulers()
+        sch.step()
+
+        xm.mark_step()
         return loss
 
     def configure_optimizers(self):
@@ -69,18 +82,25 @@ if "__main__" == __name__:
     pretrain_collator = PretrainCollator(
         bun_tokenizer, image_size=config.image_size, patch_size=config.patch_size
     )
+    sampler = DistributedSampler(
+        pretrain_task,
+        num_replicas=xm.xrt_world_size(),
+        rank=xm.get_ordinal(),
+        shuffle=False,
+    )
     dataloader = DataLoader(
         pretrain_task,
         batch_size=8,
         num_workers=24,
         collate_fn=pretrain_collator,
         drop_last=True,
+        sampler=sampler
     )
 
     wrapper = Wrapper(config, warmup_ratio=0.2, learn_rate=5.0e-05, use_phobert=False)
 
     do_every_n_steps = 1000
-    root_dir = "logs"
+    root_dir = "pls-logs"
 
     trainer = Trainer(
         enable_checkpointing=True,
