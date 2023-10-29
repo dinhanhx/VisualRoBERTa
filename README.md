@@ -57,18 +57,6 @@ To cite this repos or the models' weights or the theory,
 
 ⚠ This entry will be updated when the white paper is published or released to the public.
 
-## Project Structure
-
-```bash
-# update this
-```
-
-You can run evaluation files (such as `eval_vqa.py`) on CPU, GPU, TPU (by default, it's on CPU).
-
-For training (`run`) files (such as `run_pretrain.py`):
-- For TPU, just run it like normal
-- For GPU, you gotta remove/modify anything related to TPU such as `xla`, `tpu`, `xm`, `xla_spawn_debug`, `DistributedSampler`...
-
 ## Setup Dependencies
 
 - For TPU, you just can `pip install` [requirements.txt](requirements.txt)
@@ -77,9 +65,6 @@ For training (`run`) files (such as `run_pretrain.py`):
 ## Download Dataset
 
 In training (`run`) files (such as `run_ptrain.py`), paths to data folders are hardcoded
-```bash
-# update this
-```
 
 ⚠ `TranslateCOCO2017` also contains json files from UIT-ViIC.
 
@@ -101,6 +86,9 @@ python -m exp.run_<task_name_go_here>.py
 for example, `python run_pretrain.py` will pretrain the model.
 
 You are encouraged to read these files to understand what they do before training.
+
+- For TPU, just run it like normal
+- For GPU, you gotta remove/modify anything related to TPU such as `xla`, `tpu`, `xm`, `xla_spawn_debug`, `DistributedSampler`...
 
 ⚠ Hardcoded file paths might be updated.
 
